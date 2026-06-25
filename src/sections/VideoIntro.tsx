@@ -15,25 +15,38 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
   const [soundHint, setSoundHint] = useState(true);
   const hasVideo = true;
 
-  const toggleMute = () => {
-    const v = videoRef.current, a = ambientRef.current;
-    if (v) v.muted = !muted;
-    if (a) a.muted = !muted;
-    setMuted(m => !m);
+  const toggleMute = async () => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    const newMuted = !muted;
+    v.muted = newMuted;
+
+    if (!newMuted) {
+      try {
+        await v.play();
+      } catch (_) {
+        v.muted = true;
+        setMuted(true);
+        setSoundHint(false);
+        return;
+      }
+    }
+
+    setMuted(newMuted);
     setSoundHint(false);
   };
 
-  /* GSAP entrance — stagger children */
   useEffect(() => {
     if (!contentRef.current) return;
     const children = Array.from(contentRef.current.children);
     const ctx = gsap.context(() => {
       gsap.from(children, {
-        opacity: 0, y: 60,
-        duration: 1.2,
-        stagger: 0.2,
+        opacity: 0, y: 40,
+        duration: 1.0,
+        stagger: 0.18,
         ease: "power3.out",
-        delay: 0.3,
+        delay: 0.2,
         clearProps: "all",
       });
     }, sectionRef);
@@ -46,14 +59,14 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
     <section ref={sectionRef} id="hero"
       className="relative min-h-screen flex items-center justify-center overflow-hidden">
 
-      {/* ── Video layers ── */}
       {hasVideo ? (
         <>
-          {/* Blurred ambient duplicate */}
+          {/* Blurred ambient layer — always muted, never plays audio */}
           <video ref={ambientRef} src="/hero-video.mp4"
             autoPlay loop muted playsInline
-            className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-30 pointer-events-none" />
-          {/* Foreground video */}
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-30 pointer-events-none"
+            aria-hidden="true" />
+          {/* Foreground video — audio toggled by user */}
           <video ref={videoRef} src="/hero-video.mp4"
             autoPlay loop muted playsInline
             className="absolute inset-0 w-full h-full object-cover pointer-events-none"
@@ -64,7 +77,7 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
           style={{ backgroundImage: "url('/profile.png')", backgroundSize: "cover", backgroundPosition: "center top" }} />
       )}
 
-      {/* Cinematic gradient overlays — keep text readable */}
+      {/* Cinematic gradient overlays */}
       <div className="absolute inset-0 pointer-events-none" style={{
         background: "linear-gradient(to bottom, rgba(8,12,21,0.55) 0%, rgba(8,12,21,0.05) 30%, rgba(8,12,21,0.05) 65%, rgba(8,12,21,0.92) 100%)",
       }} />
@@ -72,11 +85,10 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
         background: "radial-gradient(ellipse at center, transparent 10%, rgba(8,12,21,0.45) 100%)",
       }} />
 
-      {/* ── Hero content ── */}
+      {/* Hero content */}
       <div ref={contentRef}
         className="relative z-20 flex flex-col items-center text-center px-6 max-w-5xl mx-auto w-full">
 
-        {/* Availability badge */}
         <div className="mb-8">
           <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs tracking-[0.28em] uppercase"
             style={{ border: "1px solid rgba(255,140,60,0.4)", color: "rgba(255,165,80,1)", background: "rgba(255,120,40,0.08)" }}>
@@ -85,7 +97,6 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
           </div>
         </div>
 
-        {/* Large stacked name */}
         <div className="mb-5">
           <h1 className="font-black leading-[0.88] tracking-tight"
             style={{ fontSize: "clamp(3.8rem, 11vw, 9rem)" }}>
@@ -103,7 +114,6 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
           </h1>
         </div>
 
-        {/* Role */}
         <div className="mb-10">
           <p className="text-sm md:text-base tracking-[0.25em] uppercase font-light"
             style={{ color: "rgba(255,255,255,0.5)", textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}>
@@ -111,7 +121,6 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
           </p>
         </div>
 
-        {/* CTA row */}
         <div className="flex flex-wrap justify-center gap-4">
           <button onClick={onScrollDown}
             className="flex items-center gap-2 px-8 py-3.5 rounded-full font-semibold text-sm transition-all duration-300"
@@ -131,7 +140,7 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
         </div>
       </div>
 
-      {/* ── Stats bar pinned above scroll indicator ── */}
+      {/* Stats bar */}
       <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 flex gap-10 md:gap-20 px-10 py-5 rounded-2xl"
         style={{
           background: "rgba(8,12,21,0.7)",
@@ -153,7 +162,7 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
         ))}
       </div>
 
-      {/* ── Mute control ── */}
+      {/* Mute / unmute control */}
       <div className="absolute top-20 right-5 z-30 flex items-center gap-3">
         {soundHint && (
           <div className="text-[11px] px-3 py-1.5 rounded-full"
@@ -161,7 +170,7 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
             Tap for sound
           </div>
         )}
-        <button onClick={toggleMute}
+        <button onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}
           className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200"
           style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.14)" }}
           onMouseEnter={e => e.currentTarget.style.border = "1px solid rgba(255,255,255,0.3)"}
@@ -173,13 +182,12 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
         </button>
       </div>
 
-      {/* ── Scroll indicator ── */}
+      {/* Scroll indicator */}
       <button onClick={onScrollDown}
         className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2"
         style={{ color: "rgba(255,255,255,0.25)" }}>
         <span className="text-[10px] tracking-[0.3em] uppercase">Scroll</span>
-        <div className="relative w-px h-10 overflow-hidden"
-          style={{ background: "rgba(255,255,255,0.1)" }}>
+        <div className="relative w-px h-10 overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
           <div className="absolute top-0 left-0 w-full h-1/2" style={{
             background: "linear-gradient(to bottom, rgba(255,140,60,0.9), transparent)",
             animation: "scrollPulse 1.8s ease-in-out infinite",

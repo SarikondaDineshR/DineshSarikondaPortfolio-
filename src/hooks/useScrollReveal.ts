@@ -4,10 +4,6 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 gsap.registerPlugin(ScrollTrigger);
 
-/**
- * Attach a scroll-reveal animation to a container element.
- * Children animate in with a staggered fade-up when the container enters the viewport.
- */
 export function useScrollReveal(options?: {
   stagger?: number;
   y?: number;
@@ -23,18 +19,25 @@ export function useScrollReveal(options?: {
     const children = Array.from(el.children) as HTMLElement[];
     if (!children.length) return;
 
+    children.forEach(c => { c.style.willChange = "opacity, transform"; });
+
     const ctx = gsap.context(() => {
       gsap.from(children, {
         opacity: 0,
-        y: options?.y ?? 50,
-        duration: options?.duration ?? 0.9,
-        stagger: options?.stagger ?? 0.12,
-        ease: "power3.out",
+        y: options?.y ?? 30,
+        duration: options?.duration ?? 0.7,
+        stagger: options?.stagger ?? 0.1,
+        ease: "power2.out",
         clearProps: "all",
         scrollTrigger: {
           trigger: el,
-          start: options?.start ?? "top 82%",
+          start: options?.start ?? "top 88%",
           toggleActions: "play none none none",
+          fastScrollEnd: true,
+          preventOverlaps: true,
+        },
+        onComplete: () => {
+          children.forEach(c => { c.style.willChange = "auto"; });
         },
       });
     }, el);
@@ -45,7 +48,6 @@ export function useScrollReveal(options?: {
   return ref;
 }
 
-/** Fade-up a single element on scroll */
 export function useScrollFade(options?: { y?: number; duration?: number; start?: string }) {
   const ref = useRef<HTMLElement>(null);
 
@@ -53,18 +55,23 @@ export function useScrollFade(options?: { y?: number; duration?: number; start?:
     const el = ref.current;
     if (!el) return;
 
+    (el as HTMLElement).style.willChange = "opacity, transform";
+
     const ctx = gsap.context(() => {
       gsap.from(el, {
         opacity: 0,
-        y: options?.y ?? 40,
-        duration: options?.duration ?? 1.0,
-        ease: "power3.out",
+        y: options?.y ?? 24,
+        duration: options?.duration ?? 0.7,
+        ease: "power2.out",
         clearProps: "all",
         scrollTrigger: {
           trigger: el,
-          start: options?.start ?? "top 85%",
+          start: options?.start ?? "top 90%",
           toggleActions: "play none none none",
+          fastScrollEnd: true,
+          preventOverlaps: true,
         },
+        onComplete: () => { (el as HTMLElement).style.willChange = "auto"; },
       });
     }, el);
 
