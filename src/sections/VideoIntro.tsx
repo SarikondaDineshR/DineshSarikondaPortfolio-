@@ -7,36 +7,79 @@ interface VideoIntroProps {
 }
 
 export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
-  const sectionRef = useRef<HTMLElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const ambientRef = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted]       = useState(true);
+  const sectionRef  = useRef<HTMLElement>(null);
+  const contentRef  = useRef<HTMLDivElement>(null);
+  const videoRef    = useRef<HTMLVideoElement>(null);
+  const ambientRef  = useRef<HTMLVideoElement>(null);
+
+  const [muted, setMuted]         = useState(true);
   const [soundHint, setSoundHint] = useState(true);
+  const [firstPlay, setFirstPlay] = useState(true); // true = waiting for / during the first unmuted play
+
   const hasVideo = true;
 
+  // ── Mute toggle (user-driven) ──────────────────────────────────────────────
   const toggleMute = async () => {
     const v = videoRef.current;
     if (!v) return;
-
-    const newMuted = !muted;
-    v.muted = newMuted;
-
-    if (!newMuted) {
-      try {
-        await v.play();
-      } catch (_) {
-        v.muted = true;
-        setMuted(true);
-        setSoundHint(false);
-        return;
-      }
+    const next = !muted;
+    v.muted = next;
+    if (!next) {
+      try { await v.play(); } catch (_) { v.muted = true; setMuted(true); return; }
     }
-
-    setMuted(newMuted);
+    setMuted(next);
     setSoundHint(false);
   };
 
+  // ── First-play: wait 2 s, play with audio once, then loop muted ───────────
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !hasVideo) return;
+
+    // Pause it initially (autoPlay is off on the foreground video)
+    v.pause();
+    v.currentTime = 0;
+
+    const timer = setTimeout(async () => {
+      if (!videoRef.current) return;
+      const vid = videoRef.current;
+      vid.loop  = false;   // play only once with audio
+      vid.muted = false;
+      setMuted(false);
+      setSoundHint(false);
+      try {
+        await vid.play();
+      } catch (_) {
+        // Browser blocked autoplay with audio — fall back to muted loop
+        vid.muted = true;
+        vid.loop  = true;
+        setMuted(true);
+        setSoundHint(false);
+        setFirstPlay(false);
+        vid.play().catch(() => {});
+      }
+    }, 2000);
+
+    // When the first unmuted play finishes, switch to muted loop
+    const handleEnded = () => {
+      const vid = videoRef.current;
+      if (!vid) return;
+      vid.muted       = true;
+      vid.loop        = true;
+      vid.currentTime = 0;
+      setMuted(true);
+      setFirstPlay(false);
+      vid.play().catch(() => {});
+    };
+
+    v.addEventListener("ended", handleEnded);
+    return () => {
+      clearTimeout(timer);
+      v.removeEventListener("ended", handleEnded);
+    };
+  }, []);
+
+  // ── GSAP hero entrance ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!contentRef.current) return;
     const children = Array.from(contentRef.current.children);
@@ -51,7 +94,7 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
       });
     }, sectionRef);
 
-    const t = setTimeout(() => setSoundHint(false), 5000);
+    const t = setTimeout(() => setSoundHint(false), 6000);
     return () => { ctx.revert(); clearTimeout(t); };
   }, []);
 
@@ -61,14 +104,15 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
 
       {hasVideo ? (
         <>
-          {/* Blurred ambient layer — always muted, never plays audio */}
+          {/* Blurred ambient — always muted, always looping */}
           <video ref={ambientRef} src="/hero-video.mp4"
             autoPlay loop muted playsInline
             className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-30 pointer-events-none"
             aria-hidden="true" />
-          {/* Foreground video — audio toggled by user */}
+
+          {/* Foreground — starts paused, plays with audio once, then loops muted */}
           <video ref={videoRef} src="/hero-video.mp4"
-            autoPlay loop muted playsInline
+            playsInline
             className="absolute inset-0 w-full h-full object-cover pointer-events-none"
             style={{ objectPosition: "center center" }} />
         </>
@@ -164,10 +208,10 @@ export default function VideoIntro({ onScrollDown }: VideoIntroProps) {
 
       {/* Mute / unmute control */}
       <div className="absolute top-20 right-5 z-30 flex items-center gap-3">
-        {soundHint && (
+        {soundHint && firstPlay && (
           <div className="text-[11px] px-3 py-1.5 rounded-full"
             style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
-            Tap for sound
+            Playing with sound…
           </div>
         )}
         <button onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}
